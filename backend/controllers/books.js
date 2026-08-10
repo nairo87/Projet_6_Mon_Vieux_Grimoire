@@ -3,11 +3,10 @@ const path = require('path');
 const sharp = require('sharp');
 const Book = require('../models/Book');
 
-// Répertoire où sont stockées les images optimisées
+// Répertoire images
 const IMAGES_DIR = path.join(__dirname, '..', 'images');
 
-// Convertit et redimensionne l'image reçue par Multer (en mémoire, req.file.buffer)
-// en un fichier .webp optimisé, écrit dans /images, et renvoie son nom de fichier.
+// Convertit et redimensionne l'image
 async function saveOptimizedImage(file) {
   const filename = `${Date.now()}-${Math.round(Math.random() * 1e9)}.webp`;
   await sharp(file.buffer)
@@ -22,7 +21,7 @@ function deleteImageFile(imageUrl) {
   const filename = imageUrl.split('/images/')[1];
   if (!filename) return;
   fs.unlink(path.join(IMAGES_DIR, filename), (err) => {
-    if (err) console.error('Erreur lors de la suppression de l’image :', err.message);
+    if (err) console.error('Erreur lors de la suppression de l\'image :', err.message);
   });
 }
 
@@ -30,6 +29,22 @@ function computeAverageRating(ratings) {
   if (!ratings || ratings.length === 0) return 0;
   const sum = ratings.reduce((acc, r) => acc + r.grade, 0);
   return Math.round((sum / ratings.length) * 10) / 10; // arrondi à 1 décimale
+}
+
+function normalizeYear(rawYear) {
+  if (rawYear === undefined || rawYear === null || rawYear === '') return rawYear;
+
+  if (typeof rawYear === 'number' && !Number.isNaN(rawYear)) return rawYear;
+  if (typeof rawYear === 'string' && /^\d+$/.test(rawYear.trim())) {
+    return parseInt(rawYear, 10);
+  }
+
+  const parsedDate = new Date(rawYear);
+  if (!Number.isNaN(parsedDate.getTime())) {
+    return parsedDate.getFullYear();
+  }
+
+  return rawYear;
 }
 
 exports.getAllBooks = (req, res, next) => {
@@ -61,6 +76,7 @@ exports.createBook = async (req, res, next) => {
     delete bookObject._id;
     delete bookObject._userId;
     delete bookObject.averageRating;
+    bookObject.year = normalizeYear(bookObject.year);
 
     if (!req.file) {
       return res.status(400).json({ message: 'Une image est requise.' });
@@ -68,17 +84,26 @@ exports.createBook = async (req, res, next) => {
 
     const filename = await saveOptimizedImage(req.file);
 
-    const book = new Book({
-      ...bookObject,
-      userId: req.auth.userId,
-      imageUrl: `${req.protocol}://${req.get('host')}/images/${filename}`,
-      ratings: [],
-      averageRating: 0,
-    });
+    const filename = await saveOptimizedImage(req.file);
+
+const initialRatings = Array.isArray(bookObject.ratings)
+  ? bookObject.ratings
+      .filter((r) => typeof r.grade === 'number' && r.grade >= 0 && r.grade <= 5)
+      .map((r) => ({ userId: req.auth.userId, grade: r.grade }))
+  : [];
+
+const book = new Book({
+  ...bookObject,
+  userId: req.auth.userId,
+  imageUrl: `${req.protocol}://${req.get('host')}/images/${filename}`,
+  ratings: initialRatings,
+  averageRating: computeAverageRating(initialRatings),
+});
 
     await book.save();
     res.status(201).json({ message: 'Livre enregistré !' });
   } catch (error) {
+    console.error('Erreur createBook :', error);
     res.status(400).json({ error });
   }
 };
@@ -101,6 +126,9 @@ exports.modifyBook = async (req, res, next) => {
     delete newBookData.userId;
     delete newBookData.ratings;
     delete newBookData.averageRating;
+    if (newBookData.year !== undefined) {
+  newBookData.year = normalizeYear(newBookData.year);
+}
 
     if (req.file) {
       const filename = await saveOptimizedImage(req.file);
