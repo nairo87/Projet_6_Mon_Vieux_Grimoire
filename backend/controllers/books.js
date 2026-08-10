@@ -84,8 +84,6 @@ exports.createBook = async (req, res, next) => {
 
     const filename = await saveOptimizedImage(req.file);
 
-    const filename = await saveOptimizedImage(req.file);
-
 const initialRatings = Array.isArray(bookObject.ratings)
   ? bookObject.ratings
       .filter((r) => typeof r.grade === 'number' && r.grade >= 0 && r.grade <= 5)
