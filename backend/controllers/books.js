@@ -31,22 +31,6 @@ function computeAverageRating(ratings) {
   return Math.round((sum / ratings.length) * 10) / 10; // arrondi à 1 décimale
 }
 
-function normalizeYear(rawYear) {
-  if (rawYear === undefined || rawYear === null || rawYear === '') return rawYear;
-
-  if (typeof rawYear === 'number' && !Number.isNaN(rawYear)) return rawYear;
-  if (typeof rawYear === 'string' && /^\d+$/.test(rawYear.trim())) {
-    return parseInt(rawYear, 10);
-  }
-
-  const parsedDate = new Date(rawYear);
-  if (!Number.isNaN(parsedDate.getTime())) {
-    return parsedDate.getFullYear();
-  }
-
-  return rawYear;
-}
-
 exports.getAllBooks = (req, res, next) => {
   Book.find()
     .then((books) => res.status(200).json(books))
@@ -76,7 +60,6 @@ exports.createBook = async (req, res, next) => {
     delete bookObject._id;
     delete bookObject._userId;
     delete bookObject.averageRating;
-    bookObject.year = normalizeYear(bookObject.year);
 
     if (!req.file) {
       return res.status(400).json({ message: 'Une image est requise.' });
