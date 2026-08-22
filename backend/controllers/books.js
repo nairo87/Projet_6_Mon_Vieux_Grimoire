@@ -107,9 +107,6 @@ exports.modifyBook = async (req, res, next) => {
     delete newBookData.userId;
     delete newBookData.ratings;
     delete newBookData.averageRating;
-    if (newBookData.year !== undefined) {
-  newBookData.year = normalizeYear(newBookData.year);
-}
 
     if (req.file) {
       const filename = await saveOptimizedImage(req.file);
